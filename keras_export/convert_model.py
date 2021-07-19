@@ -356,6 +356,7 @@ def show_relu_layer(layer):
     """Serialize relu layer to dict"""
     assert layer.negative_slope == 0
     assert layer.threshold == 0
+    assert layer.max_value == None
     return {}
 
 
@@ -497,12 +498,6 @@ def show_softmax_layer(layer):
     assert layer.axis == -1
 
 
-def show_reshape_layer(layer):
-    """Serialize reshape layer to dict"""
-    for dim_size in layer.target_shape:
-        assert dim_size != -1, 'Reshape inference not supported'
-
-
 def get_layer_functions_dict():
     return {
         'Conv1D': show_conv_1d_layer,
@@ -594,13 +589,43 @@ def is_ascii(some_string):
         return True
 
 
+def get_layer_weights(layer, name):
+    """Serialize all weights of a single normal layer"""
+    result = {}
+    layer_type = type(layer).__name__
+    if hasattr(layer, 'data_format'):
+        if layer_type in ['AveragePooling1D', 'MaxPooling1D', 'AveragePooling2D', 'MaxPooling2D',
+                          'GlobalAveragePooling1D', 'GlobalMaxPooling1D', 'GlobalAveragePooling2D',
+                          'GlobalMaxPooling2D']:
+            assert layer.data_format == 'channels_last' or layer.data_format == 'channels_first'
+        else:
+            assert layer.data_format == 'channels_last'
+
+    show_func = get_layer_functions_dict().get(layer_type, None)
+    shown_layer = None
+    if show_func:
+        shown_layer = show_func(layer)
+    if shown_layer:
+        result[name] = shown_layer
+    if show_func and layer_type == 'TimeDistributed':
+        if name not in result:
+            result[name] = {}
+
+        result[name]['td_input_len'] = encode_floats(np.array([len(layer.input_shape) - 1], dtype=np.float32))
+        result[name]['td_output_len'] = encode_floats(np.array([len(layer.output_shape) - 1], dtype=np.float32))
+    return result
+
+
 def get_all_weights(model, prefix):
     """Serialize all weights of the models layers"""
-    show_layer_functions = get_layer_functions_dict()
     result = {}
     layers = model.layers
     assert K.image_data_format() == 'channels_last'
     for layer in layers:
+        for node in layer.inbound_nodes:
+            if "training" in node.call_kwargs:
+                assert node.call_kwargs["training"] is not True, \
+                    "training=true is not supported, see https://github.com/Dobiasd/frugally-deep/issues/284"
         layer_type = type(layer).__name__
         name = prefix + layer.name
         assert is_ascii(name)
@@ -608,27 +633,12 @@ def get_all_weights(model, prefix):
             raise ValueError('duplicate layer name ' + name)
         if layer_type in ['Model', 'Sequential', 'Functional']:
             result = merge_two_disjunct_dicts(result, get_all_weights(layer, name + '_'))
+        elif layer_type in ['TimeDistributed'] and type(layer.layer).__name__ in ['Model', 'Sequential', 'Functional']:
+            inner_layer = layer.layer
+            result = merge_two_disjunct_dicts(result, get_layer_weights(layer, name))
+            result = merge_two_disjunct_dicts(result, get_all_weights(inner_layer, name + "_"))
         else:
-            if hasattr(layer, 'data_format'):
-                if layer_type in ['AveragePooling1D', 'MaxPooling1D', 'AveragePooling2D', 'MaxPooling2D',
-                                  'GlobalAveragePooling1D', 'GlobalMaxPooling1D', 'GlobalAveragePooling2D',
-                                  'GlobalMaxPooling2D']:
-                    assert layer.data_format == 'channels_last' or layer.data_format == 'channels_first'
-                else:
-                    assert layer.data_format == 'channels_last'
-
-            show_func = show_layer_functions.get(layer_type, None)
-            shown_layer = None
-            if show_func:
-                shown_layer = show_func(layer)
-            if shown_layer:
-                result[name] = shown_layer
-            if show_func and layer_type == 'TimeDistributed':
-                if name not in result:
-                    result[name] = {}
-
-                result[name]['td_input_len'] = encode_floats(np.array([len(layer.input_shape) - 1], dtype=np.float32))
-                result[name]['td_output_len'] = encode_floats(np.array([len(layer.output_shape) - 1], dtype=np.float32))
+            result = merge_two_disjunct_dicts(result, get_layer_weights(layer, name))
     return result
 
 
@@ -662,12 +672,19 @@ def convert_sequential_to_model(model):
             model._inbound_nodes = inbound_nodes
         elif hasattr(model, 'inbound_nodes'):
             model.inbound_nodes = inbound_nodes
-    assert model.layers
-    for i in range(len(model.layers)):
-        layer_type = type(model.layers[i]).__name__
-        if layer_type in ['Model', 'Sequential', 'Functional']:
-            # "model.layers[i] = ..." would not overwrite the layer.
-            model._layers[i] = convert_sequential_to_model(model.layers[i])
+    if type(model).__name__ == 'TimeDistributed':
+        model.layer = convert_sequential_to_model(model.layer)
+    if type(model).__name__ in ['Model', 'Functional']:
+        for i in range(len(model.layers)):
+            new_layer = convert_sequential_to_model(model.layers[i])
+            layers = getattr(model, '_layers', None)
+            if not layers:
+                layers = getattr(model, '_self_tracked_trackables', None)
+            if layers:
+                if new_layer == layers[i]:
+                    continue
+                layers[i] = new_layer
+                assert model.layers[i] == new_layer
     return model
 
 
