@@ -58,6 +58,7 @@
 #include "fdeep/layers/multiply_layer.hpp"
 #include "fdeep/layers/pooling_2d_layer.hpp"
 #include "fdeep/layers/relu_layer.hpp"
+#include "fdeep/layers/repeat_vector_layer.hpp"
 #include "fdeep/layers/reshape_layer.hpp"
 #include "fdeep/layers/separable_conv_2d_layer.hpp"
 #include "fdeep/layers/selu_layer.hpp"
@@ -727,6 +728,14 @@ inline layer_ptr create_cropping_2d_layer(
     }
 }
 
+inline layer_ptr create_repeat_vector_layer(
+    const get_param_f&, const nlohmann::json& data,
+    const std::string& name)
+{
+    auto repeat_times = create_size_t(data["config"]["n"]);
+    return std::make_shared<repeat_vector_layer>(name, repeat_times);
+}
+
 inline layer_ptr create_reshape_layer(
     const get_param_f&, const nlohmann::json& data,
     const std::string& name)
@@ -1132,6 +1141,7 @@ inline layer_ptr create_layer(const get_param_f& get_param,
             {"CuDNNGRU", create_gru_layer},
             {"Bidirectional", create_bidirectional_layer},
             {"Softmax", create_softmax_layer},
+            {"RepeatVector", create_repeat_vector_layer},
         };
 
     const wrapper_layer_creators wrapper_creators = {
