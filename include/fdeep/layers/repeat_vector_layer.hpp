@@ -22,9 +22,9 @@ protected:
     {
         const auto& input = single_tensor_from_tensors(inputs);
         tensors result;
-        for (auto i = 0; i < n_; ++i)
+        for (size_t i = 0; i < n_; ++i)
             result.push_back(input);
-        return result;
+        return {concatenate_tensors(result, 0)};
     }
     size_t n_;
 };
