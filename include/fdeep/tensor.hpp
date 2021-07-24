@@ -940,7 +940,7 @@ inline void tensor_into_bytes(const tensor& t, std::uint8_t* value_ptr,
     internal::float_type low = 0.0f, internal::float_type high = 1.0f)
 {
     const auto values = t.as_vector();
-    internal::assertion(bytes_available == values->size(),
+    assertion(bytes_available == values->size(),
     "invalid buffer size");
     const auto bytes = fplus::transform(
         [low, high](internal::float_type v) -> std::uint8_t
@@ -980,7 +980,7 @@ inline tensors_vec reshape_tensor_vectors(
             [](const tensor& t) -> float_vec {return *t.as_vector();},
             tss)));
 
-    fdeep::internal::assertion(values.size() == vectors_size * vector_size * height * width * depth,
+    assertion(values.size() == vectors_size * vector_size * height * width * depth,
         "Invalid number of values for reshape target.");
 
     const auto ts = fplus::transform(

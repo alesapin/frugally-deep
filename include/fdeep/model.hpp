@@ -26,7 +26,7 @@ public:
     // For those, use predict_stateful instead.
     tensors predict(const tensors& inputs) const
     {
-        internal::assertion(!is_stateful(),
+        assertion(!is_stateful(),
             "Prediction on stateful models is not const. Use predict_stateful instead.");
         return predict_impl(inputs);
     }
@@ -43,7 +43,7 @@ public:
     std::vector<tensors> predict_multi(const std::vector<tensors>& inputs_vec,
         bool parallelly) const
     {
-        internal::assertion(!is_stateful(),
+        assertion(!is_stateful(),
             "Prediction on stateful models is not thread-safe.");
         const auto f = [this](const tensors& inputs) -> tensors
         {
@@ -65,7 +65,7 @@ public:
     // Returns the index of the output neuron with the maximum activation.
     std::size_t predict_class(const tensors& inputs) const
     {
-        internal::assertion(!is_stateful(),
+        assertion(!is_stateful(),
             "Prediction on stateful models is not const. Use predict_class_stateful instead.");
         return predict_class_with_confidence_impl(inputs).first;
     }
@@ -80,7 +80,7 @@ public:
     std::pair<std::size_t, float_type>
     predict_class_with_confidence(const tensors& inputs) const
     {
-        internal::assertion(!is_stateful(),
+        assertion(!is_stateful(),
             "Prediction on stateful models is not const. Use predict_class_with_confidence_stateful instead.");
         return predict_class_with_confidence_impl(inputs);
     }
@@ -97,7 +97,7 @@ public:
     // Returns this one activation value.
     float_type predict_single_output(const tensors& inputs) const
     {
-        internal::assertion(!is_stateful(),
+        assertion(!is_stateful(),
             "Prediction on stateful models is not const. Use predict_single_output_stateful instead.");
         return predict_single_output_impl(inputs);
     }
@@ -190,7 +190,7 @@ private:
         const auto input_shapes = fplus::transform(
             fplus_c_mem_fn_t(tensor, shape, tensor_shape),
             inputs);
-        internal::assertion(input_shapes
+        assertion(input_shapes
             == get_input_shapes(),
             std::string("Invalid inputs shape.\n") +
                 "The model takes " + show_tensor_shapes_variable(get_input_shapes()) +
@@ -201,7 +201,7 @@ private:
         const auto output_shapes = fplus::transform(
             fplus_c_mem_fn_t(tensor, shape, tensor_shape),
             outputs);
-        internal::assertion(output_shapes
+        assertion(output_shapes
             == get_output_shapes(),
             std::string("Invalid outputs shape.\n") +
                 "The model should return " + show_tensor_shapes_variable(get_output_shapes()) +
@@ -214,11 +214,10 @@ private:
     predict_class_with_confidence_impl(const tensors& inputs) const
     {
         const tensors outputs = predict(inputs);
-        internal::assertion(outputs.size() == 1,
+        assertion(outputs.size() == 1,
             std::string("invalid number of outputs.\n") +
             "Use model::predict instead of model::predict_class.");
-        const auto output_shape = outputs.front().shape();
-        internal::assertion(output_shape.without_depth().area() == 1,
+        assertion(outputs.front().shape().without_depth().area() == 1,
             std::string("invalid output shape.\n") +
             "Use model::predict instead of model::predict_class.");
         const auto pos = internal::tensor_max_pos(outputs.front());
@@ -228,10 +227,9 @@ private:
     float_type predict_single_output_impl(const tensors& inputs) const
     {
         const tensors outputs = predict(inputs);
-        internal::assertion(outputs.size() == 1,
+        assertion(outputs.size() == 1,
             "invalid number of outputs");
-        const auto output_shape = outputs.front().shape();
-        internal::assertion(output_shape.volume() == 1,
+        assertion(outputs.front().shape().volume() == 1,
             "invalid output shape");
         return to_singleton_value(outputs.front());
     }
@@ -298,7 +296,7 @@ inline model read_model(std::istream& model_file_stream,
     log_duration();
 
     const std::string image_data_format = json_data["image_data_format"];
-    internal::assertion(image_data_format == "channels_last",
+    assertion(image_data_format == "channels_last",
         "only channels_last data format supported");
 
     const std::function<nlohmann::json(
@@ -370,7 +368,7 @@ inline model load_model(const std::string& file_path,
 {
     fplus::stopwatch stopwatch;
     std::ifstream in_stream(file_path);
-    internal::assertion(in_stream.good(), "Can not open " + file_path);
+    assertion(in_stream.good(), "Can not open " + file_path);
     const auto model = read_model(in_stream, verify, logger, verify_epsilon,
     custom_layer_creators);
     if (logger)

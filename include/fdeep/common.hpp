@@ -30,6 +30,12 @@
 
 #include <fplus/fplus.hpp>
 
+#ifndef NDEBUG
+#   define assertion(Expr, Msg) internal::assertion_impl(Expr, Msg)
+#else
+#   define assertion(Expr, Msg) ;
+#endif
+
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -57,7 +63,7 @@ inline void raise_error(const std::string& msg)
     throw error(msg);
 }
 
-inline void assertion(bool cond, const std::string& error)
+inline void assertion_impl(bool cond, const std::string& error)
 {
     if (!cond)
     {

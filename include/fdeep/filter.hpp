@@ -72,10 +72,8 @@ inline filter_vec generate_filters(
     filter_vec filters(k, filter(tensor(filter_shape, 0), 0));
 
     assertion(!filters.empty(), "at least one filter needed");
-    const std::size_t param_count = fplus::sum(fplus::transform(
-        fplus_c_mem_fn_t(filter, volume, std::size_t), filters));
-
-    assertion(static_cast<std::size_t>(weights.size()) == param_count,
+    assertion(static_cast<std::size_t>(weights.size()) == fplus::sum(fplus::transform(
+        fplus_c_mem_fn_t(filter, volume, std::size_t), filters)),
         "invalid weight size");
     const auto filter_param_cnt = filters.front().shape().volume();
 
